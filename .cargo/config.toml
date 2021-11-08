@@ -1,0 +1,9 @@
+[build]
+target = "mipsel-unknown-none"
+
+[target.mipsel-unknown-none]
+rustflags = ["-Clink-arg=--nmagic", "-Clink-arg=--image-base=0x13370000", "-Crelocation-model=static", "-Ccode-model=large", "-Ctarget-feature=+mips4,-mips32,-mips32r2"]
+
+[unstable]
+build-std = ["core"]
+
