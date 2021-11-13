@@ -5,5 +5,6 @@ all:
 
 clippy:
 	cargo clippy -- -F clippy::missing_docs_in_private_items
+
 objdump: all
 	objdump --demangle -d target/mipsel-unknown-none/release/mipstest
