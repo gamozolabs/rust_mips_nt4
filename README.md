@@ -22,7 +22,7 @@ to the hosted `felfserv` which then causes the payload to execute in the guest.
 The comms from the guest are sent to the `felfserv` over the socket that was
 used to download the shellcode.
 
-# Felserv
+# Felfserv
 
 `felfserv` is a server for FELF files. You can find the FELF converter at
 [elfloader](https://github.com/gamozolabs/elfloader). You need to install this
