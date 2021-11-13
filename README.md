@@ -3,6 +3,75 @@
 This is a project which allows us to run Rust "shellcode" in a MIPS
 environment on NT 4.0.
 
+# TL;DR
+
+## Setup NT
+
+Install NT 4.0 MIPS in QEMU using the command you see in `qemu/run.sh`.
+
+### Create disk and run system
+
+```
+qemu-img create –f qcow2 nt4.disk 2G
+./qemu/run.sh
+```
+
+### Setup system so you can access CD
+
+```
+Run Setup > Initialize system > Set default configuration > (choose your res)
+    > Floppy 3.5
+    > Second floppy: No
+    > SCSI host ID 7
+```
+
+### Setup ethernet address so network works in Windows
+
+```
+Run Setup > Initialize system > Set ethernet address
+    > Pick an address (MUST BE A UNICAST MAC ADDRESS OR WINDOWS GETS MAD)
+    > I used be2d08345673 with great success
+```
+
+### Boot partition
+
+You must configure a small boot partition for the bootloader
+
+Go to run program:
+
+```
+cd:\mips\arcinst
+```
+
+A 5 MiB partition will do
+
+### Install Windows
+
+```
+cd:\mips\setupldr
+```
+
+### Configure time
+
+The time in Windows doesn't persist, set it inside Windows to something
+reasonable otherwise you'll get weird errors and `cl.exe` will not work so
+you won't be able to compile anything.
+
+## Use the tool
+
+Deploy `server.exe` and `client.exe` to the system, then run `server.exe`
+inside QEMU.
+
+Install felfserv to your path `cd felfserv && cargo install --path .`
+
+Run felfserv (supplies code to guest over network and stdout prints from Rust
+running in guest) `felfserv 0.0.0.0:1234 ./out.felf`
+
+Run `make` to build and deploy to MIPS!
+
+Optionally run `cargo watch -- make` to get your code to re-deploy and run
+every time you change the Rust project.
+
 # Toolchain
 
 To use this you need to copy the `shellcode_client` into a MIPS guest build
