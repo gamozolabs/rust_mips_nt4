@@ -25,9 +25,9 @@ used to download the shellcode.
 # Felserv
 
 `felfserv` is a server for FELF files. You can find the FELF converter at
-[https://github.com/gamozolabs/elfloader]. You need to install this to your
-path as the `Makefile` invokes `elfloader` to convert the MIPS ELF into MIPS
-shellcode in the FELF file format.
+(elfloader)[https://github.com/gamozolabs/elfloader]. You need to install this
+to your path as the `Makefile` invokes `elfloader` to convert the MIPS ELF into
+MIPS shellcode in the FELF file format.
 
 `felfserv` simply runs like `felfserv 0.0.0.0:1234 ./out.felf`. It will listen
 to connections on IP and port you specified, and when connected to will
