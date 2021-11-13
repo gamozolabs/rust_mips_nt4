@@ -62,9 +62,9 @@ you won't be able to compile anything.
 Deploy `server.exe` and `client.exe` to the system, then run `server.exe`
 inside QEMU.
 
-Install felfserv to your path `cd felfserv && cargo install --path .`
+Install `felfserv` to your path `cd felfserv && cargo install --path .`
 
-Run felfserv (supplies code to guest over network and stdout prints from Rust
+Run `felfserv` (supplies code to guest over network and stdout prints from Rust
 running in guest) `felfserv 0.0.0.0:1234 ./out.felf`
 
 Run `make` to build and deploy to MIPS!
