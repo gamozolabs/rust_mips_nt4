@@ -3,11 +3,31 @@
 //!
 //! Very similar to MIPS o32 convention, with interleaved floats and skipped
 //! integer registers when floats are used.
+//!
+//! These wrappers use Rust naked functions and the fact that the o32 Rust-emit
+//! C ABI matches the Windows kernel ABI. This allows us to simply move the
+//! last parameter (syscall number in our Rust bindings) into the correct
+//! syscall ID register `$v0` and pass through all existing parameters. This
+//! decreases the amount of overhead and means we don't have to worry about
+//! things like register homing and stack alignment as those are handled for
+//! us.
+//!
+//! It also may be a bit confusing why we don't `ret` from the `syscall`, this
+//! is because `syscall` on MIPS actually returns to the user-provided `$lr`,
+//! meaning the `$lr` is set from the call to the naked function, thus the
+//! syscall directly returns back to the caller of the `syscall*()` wrapper
+//! function rather than to the instruction following the `syscall`
 
 /// Syscall numbers
 #[allow(dead_code)]
 #[repr(usize)]
 pub enum Syscall {
+    /// NtAllocateVirtualMemory()
+    AllocateVirtualMemory = 0xa,
+
+    /// NtFreeVirtualMemory()
+    FreeVirtualMemory = 0x3a,
+
     /// NtOpenFile()
     OpenFile = 0x4f,
     

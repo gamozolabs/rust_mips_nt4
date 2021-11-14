@@ -1,4 +1,5 @@
-//! Generic syscalls for Windows
+//! Generic syscalls for Windows, everything in here should be architecture
+//! agnostic.
 
 #[cfg(target_arch = "mips")] pub mod mips;
 #[cfg(target_arch = "mips")] pub use mips::*;
@@ -36,11 +37,91 @@ pub struct IoStatusBlock {
     pub information: usize,
 }
 
+/// Allocate virtual memory in the current process
+pub fn mmap(mut addr: usize, mut size: usize) -> Result<*mut u8> {
+    /// Commit memory
+    const MEM_COMMIT: u32 = 0x1000;
+
+    /// Reserve memory range
+    const MEM_RESERVE: u32 = 0x2000;
+
+    /// Readable and writable memory
+    const PAGE_READWRITE: u32 = 0x4;
+
+    // Perform syscall
+    let status = NtStatus(unsafe {
+        syscall6(
+            // [in] HANDLE ProcessHandle,
+            !0,
+
+            // [in, out] PVOID *BaseAddress,
+            addr_of_mut!(addr) as usize,
+
+            // [in] ULONG_PTR ZeroBits,
+            0,
+
+            // [in, out] PSIZE_T RegionSize,
+            addr_of_mut!(size) as usize,
+
+            // [in] ULONG AllocationType,
+            (MEM_COMMIT | MEM_RESERVE) as usize,
+
+            // [in] ULONG Protect
+            PAGE_READWRITE as usize,
+
+            // Syscall ID
+            Syscall::AllocateVirtualMemory,
+        )
+    } as u32);
+
+    // If success, return allocation otherwise return status
+    if status.success() {
+        Ok(addr as *mut u8)
+    } else {
+        Err(status)
+    }
+}
+
+/// De-allocate virtual memory in the current process
+pub unsafe fn munmap(mut addr: usize) -> Result<()> {
+    /// Release memory range
+    const MEM_RELEASE: u32 = 0x8000;
+
+    // Region size
+    let mut size = 0usize;
+
+    // Perform syscall
+    let status = NtStatus(syscall4(
+        // [in] HANDLE ProcessHandle,
+        !0,
+
+        // [in, out] PVOID *BaseAddress,
+        addr_of_mut!(addr) as usize,
+
+        // [in, out] PSIZE_T RegionSize,
+        addr_of_mut!(size) as usize,
+
+        // [in] ULONG AllocationType,
+        MEM_RELEASE as usize,
+
+        // Syscall ID
+        Syscall::FreeVirtualMemory,
+    ) as u32);
+
+    // Return error on error
+    if status.success() {
+        Ok(())
+    } else {
+        Err(status)
+    }
+}
+
 /// Write to a file
 pub fn write(fd: Handle, bytes: impl AsRef<[u8]>) -> Result<usize> {
     let mut offset = 0u64;
     let mut iosb = IoStatusBlock::default();
 
+    // Perform syscall
     let status = NtStatus(unsafe {
         syscall9(
             // [in] HANDLE FileHandle
