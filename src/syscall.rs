@@ -175,6 +175,7 @@ impl<T> JoinHandle<T> {
         // Wait for thread to exit
         wait(self.0)?;
        
+        //XXX TOODO FIX LEAK OF HANDLE if dropped without join
         close(self.0);
 
         let usc = Arc::try_unwrap(self.1).map_err(|_| ()).unwrap();
