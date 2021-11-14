@@ -25,17 +25,108 @@ pub enum Syscall {
     /// NtAllocateVirtualMemory()
     AllocateVirtualMemory = 0xa,
 
+    /// NtClose()
+    Close = 0xf,
+
+    /// NtCreateThread()
+    CreateThread = 0x24,
+
     /// NtFreeVirtualMemory()
     FreeVirtualMemory = 0x3a,
 
     /// NtOpenFile()
     OpenFile = 0x4f,
-    
-    /// NtWriteFile()
-    WriteFile = 0xc7,
 
     /// NtTerminateProcess()
     TerminateProcess = 0xba,
+
+    /// NtTerminateThread()
+    TerminateThread = 0xbb,
+
+    /// NtWaitForSingleObject()
+    WaitForSingleObject = 0xc4,
+    
+    /// NtWriteFile()
+    WriteFile = 0xc7,
+}
+
+/// Alignment structure for [`Context`]
+#[repr(C)]
+pub union ContextAlign {
+    /// Argument?
+    argument: u128,
+}
+
+/// Union of different bitness contexts
+#[repr(C)]
+pub union ContextBits {
+    /// 32-bit context
+    pub bits32: Context32,
+
+    /// 64-bit context
+    pub bits64: Context64,
+}
+
+/// Bitness-agnostic `_CONTEXT`
+#[repr(C)]
+pub struct Context {
+    /// Alignment structure
+    _align: ContextAlign,
+
+    /// Contexts
+    pub context: ContextBits,
+}
+
+/// 32-bit `_CONTEXT`
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct Context32 {
+    /// Floating point registers
+    pub fp: [u32; 32],
+
+    /// Integer registers
+    pub int: [u32; 34],
+
+    /// Status register?
+    pub fsr: u32,
+    
+    /// Fault instruction continuation address
+    pub fir: u32,
+
+    /// Processor status
+    pub psr: u32,
+
+    /// Context update flags
+    pub flags: u32,
+}
+
+/// 64-bit `_CONTEXT`
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct Context64 {
+    /// Floating point registers
+    pub fp: [u64; 32],
+
+    /// Filler
+    pub _fill1: u32,
+
+    /// Filler
+    pub _fill2: u32,
+
+    /// Status register?
+    pub fsr: u32,
+    
+    /// Fault instruction continuation address
+    pub fir: u32,
+
+    /// Processor status
+    pub psr: u32,
+
+    /// Context update flags
+    pub flags: u32,
+
+    /// Integer registers
+    pub int: [u64; 34],
 }
 
 /// 0-argument syscall

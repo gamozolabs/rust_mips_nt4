@@ -1,7 +1,7 @@
 //! Main program entry point for Rust
 
 #![feature(asm, naked_functions, asm_experimental_arch)]
-#![feature(default_alloc_error_handler)]
+#![feature(default_alloc_error_handler, new_uninit)]
 #![no_std]
 #![no_main]
 
@@ -16,10 +16,13 @@ mod panic;
 mod syscall;
 
 fn main() -> Result<(), ()> {
-    let veccy = vec![0u8; 1024 * 1024];
-    let format = format!("moose {:p}\n", veccy.as_ptr());
+    let asdf = 5;
 
-    println!("{}", format);
+    let thing = syscall::spawn(move || {
+        println!("asdgf {}", asdf);
+        core::cell::RefCell::new(1234)
+    }).unwrap();
+    dbg!(thing.join().unwrap());
 
     Ok(())
 }
