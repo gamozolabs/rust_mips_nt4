@@ -1,6 +1,5 @@
 //! Print and debug routines
 
-use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::syscall::Handle;
 
 /// Classic `print!()` macro
@@ -8,10 +7,7 @@ use crate::syscall::Handle;
 macro_rules! print {
     ($($arg:tt)*) => {
         let _ = core::fmt::Write::write_fmt(
-            &mut $crate::print::Writer(
-                crate::syscall::Handle(crate::print::SOCKET.load(
-                    core::sync::atomic::Ordering::Relaxed))),
-                core::format_args!($($arg)*));
+            &mut $crate::print::Writer, core::format_args!($($arg)*));
     }
 }
 
@@ -50,23 +46,23 @@ macro_rules! dbg {
     };
 }
 
-/// Socket for external print communication
-pub static SOCKET: AtomicUsize = AtomicUsize::new(0);
-
 /// Writer structure that simply implements [`core::fmt::Write`] such that we
 /// can use `write_fmt` in our [`print!`]
-pub struct Writer(pub Handle);
+pub struct Writer;
 
 impl core::fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let _ = crate::syscall::write(self.0, s);
+        let _ = crate::syscall::write(unsafe { &SOCKET }, s);
 
         Ok(())
     }
 }
 
+/// The socket handle
+static mut SOCKET: Handle = unsafe { Handle::from_raw(0) };
+
 /// Register the initial socket
 pub(super) unsafe fn register_socket(socket: Handle) {
-    SOCKET.store(socket.0, Ordering::Release);
+    core::ptr::write(&mut SOCKET, socket);
 }
 

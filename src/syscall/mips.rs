@@ -18,6 +18,13 @@
 //! syscall directly returns back to the caller of the `syscall*()` wrapper
 //! function rather than to the instruction following the `syscall`
 
+use core::mem::MaybeUninit;
+use core::ptr::{addr_of, addr_of_mut};
+use core::cell::UnsafeCell;
+use alloc::sync::Arc;
+use alloc::boxed::Box;
+use super::{NtStatus, Result, Handle, JoinHandle, MEM_RELEASE};
+
 /// Syscall numbers
 #[allow(dead_code)]
 #[repr(usize)]
@@ -235,5 +242,160 @@ pub unsafe extern fn syscall9(_: usize, _: usize, _: usize, _: usize,
         lw $v0, 0x24($sp)
         syscall
     "#, options(noreturn));
+}
+
+/// Spawn a thread
+///
+/// MIPS specific due to some inline assembly as well as MIPS-specific context
+/// structure creation.
+pub fn spawn<F, T>(f: F) -> Result<JoinHandle<T>>
+        where F: FnOnce() -> T,
+              F: Send + 'static,
+              T: Send + 'static {
+    // Holder for returned client handle
+    let mut handle = 0usize;
+
+    // Placeholder for returned client ID
+    let mut client_id = [0usize; 2];
+
+    // Create a new context
+    let mut context: Context = unsafe { core::mem::zeroed() };
+
+    // Allocate and leak a stack for the thread
+    let stack = vec![0u8; 4096].leak();
+
+    // Initial TEB, maybe some stack stuff in here!?
+    let initial_teb = [0u32; 5];
+
+    /// External thread entry point
+    extern fn entry<F, T>(func:      *mut F,
+                          ret:       *mut UnsafeCell<MaybeUninit<T>>,
+                          mut stack:  usize) -> !
+            where F: FnOnce() -> T,
+                  F: Send + 'static,
+                  T: Send + 'static {
+        // Create a scope so that we drop `Box` and `Arc`
+        {
+            // Re-box the FFI'd type
+            let func: Box<F> = unsafe {
+                Box::from_raw(func)
+            };
+
+            // Re-box the return type
+            let ret: Arc<UnsafeCell<MaybeUninit<T>>> = unsafe {
+                Arc::from_raw(ret)
+            };
+
+            // Call the closure and save the return
+            unsafe { (&mut *ret.get()).write(func()); }
+        }
+
+        // Region size
+        let mut rsize = 0usize;
+
+        unsafe {
+            asm!(r#"
+                // Set the link register
+                jal 2f
+
+                // Exit thread
+                jal 3f
+                break
+
+            2:
+                // NtFreeVirtualMemory()
+                li $v0, {free}
+                syscall
+
+            3:
+                // NtTerminateThread()
+                li $v0, {terminate}
+                li $a0, -2 // GetCurrentThread()
+                li $a1, 0  // exit code
+                syscall
+
+            "#, terminate = const Syscall::TerminateThread   as usize,
+                free      = const Syscall::FreeVirtualMemory as usize,
+                in("$4") !0usize,
+                in("$5") addr_of_mut!(stack),
+                in("$6") addr_of_mut!(rsize),
+                in("$7") MEM_RELEASE, options(noreturn));
+        }
+    }
+
+    let rbox = unsafe {
+        /// Control context
+        const CONTEXT_CONTROL: u32 = 1;
+
+        /// Floating point context
+        const CONTEXT_FLOATING_POINT: u32 = 2;
+
+        /// Integer context
+        const CONTEXT_INTEGER: u32 = 4;
+
+        // Set the flags for the registers we want to control
+        context.context.bits64.flags =
+            CONTEXT_CONTROL | CONTEXT_FLOATING_POINT | CONTEXT_INTEGER;
+
+        // Thread entry point
+        context.context.bits64.fir = entry::<F, T> as usize as u32;
+
+        // Set `$a0` argument
+        let cbox: *mut F = Box::into_raw(Box::new(f));
+        context.context.bits64.int[4] = cbox as u64;
+        
+        // Create return storage in `$a1`
+        let rbox: Arc<UnsafeCell<MaybeUninit<T>>> =
+            Arc::new(UnsafeCell::new(MaybeUninit::uninit()));
+        context.context.bits64.int[5] = Arc::into_raw(rbox.clone()) as u64;
+
+        // Pass in stack in `$a2`
+        context.context.bits64.int[6] = stack.as_mut_ptr() as u64;
+
+        // Set the 64-bit `$sp` to the end of the stack
+        context.context.bits64.int[29] =
+            stack.as_mut_ptr() as u64 + stack.len() as u64;
+        
+        rbox
+    };
+
+    // Create the thread
+    let status = NtStatus(unsafe {
+        syscall8(
+            // OUT PHANDLE ThreadHandle
+            addr_of_mut!(handle) as usize,
+
+            // IN ACCESS_MASK DesiredAccess
+            0x1f03ff,
+
+            // IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL
+            0,
+
+            // IN HANDLE ProcessHandle
+            !0,
+
+            // OUT PCLIENT_ID ClientId
+            addr_of_mut!(client_id) as usize,
+
+            // IN PCONTEXT ThreadContext,
+            addr_of!(context) as usize,
+
+            // IN PINITIAL_TEB InitialTeb
+            addr_of!(initial_teb) as usize,
+
+            // IN BOOLEAN CreateSuspended
+            0,
+
+            // Syscall number
+            Syscall::CreateThread
+        )
+    } as u32);
+
+    // Convert error to Rust error
+    if status.success() {
+        Ok(JoinHandle(Handle(handle), rbox))
+    } else {
+        Err(status)
+    }
 }
 
