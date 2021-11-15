@@ -86,7 +86,7 @@ pub fn mmap(mut addr: usize, mut size: usize) -> Result<*mut u8> {
             PAGE_READWRITE as usize,
 
             // Syscall ID
-            Syscall::AllocateVirtualMemory,
+            Syscall::AllocateVirtualMemory as usize,
         )
     } as u32);
 
@@ -121,7 +121,7 @@ pub unsafe fn munmap(mut addr: usize) -> Result<()> {
         MEM_RELEASE as usize,
 
         // Syscall ID
-        Syscall::FreeVirtualMemory,
+        Syscall::FreeVirtualMemory as usize,
     ) as u32);
 
     // Return error on error
@@ -168,7 +168,7 @@ pub fn write(fd: &Handle, bytes: impl AsRef<[u8]>) -> Result<usize> {
             0,
 
             // Syscall number
-            Syscall::WriteFile)
+            Syscall::WriteFile as usize)
     } as u32);
 
     // If success, return number of bytes written, otherwise return error
@@ -219,7 +219,7 @@ pub fn wait(handle: Handle) -> Result<()> {
 
             // [in, optional] PLARGE_INTEGER Timeout
             0,
-            Syscall::WaitForSingleObject
+            Syscall::WaitForSingleObject as usize,
         )
     } as u32);
 
@@ -235,7 +235,7 @@ pub fn wait(handle: Handle) -> Result<()> {
 fn close(handle: &Handle) -> Result<()> {
     // Close the handle
     let status = NtStatus(unsafe {
-        syscall1(handle.0, Syscall::Close)
+        syscall1(handle.0, Syscall::Close as usize)
     } as u32);
     
     // Convert error to Rust error
@@ -250,7 +250,7 @@ fn close(handle: &Handle) -> Result<()> {
 #[allow(dead_code)]
 pub fn exit_thread(code: usize) -> ! {
     unsafe {
-        syscall2((-2isize) as usize, code, Syscall::TerminateThread);
+        syscall2((-2isize) as usize, code, Syscall::TerminateThread as usize);
         core::hint::unreachable_unchecked();
     }
 }
@@ -258,7 +258,7 @@ pub fn exit_thread(code: usize) -> ! {
 /// Exit the current process with `code` as the exit status
 pub fn exit(code: usize) -> ! {
     unsafe {
-        syscall2(!0, code, Syscall::TerminateProcess);
+        syscall2(!0, code, Syscall::TerminateProcess as usize);
         core::hint::unreachable_unchecked();
     }
 }

@@ -139,7 +139,7 @@ pub struct Context64 {
 /// 0-argument syscall
 #[allow(unused)]
 #[naked]
-pub unsafe extern fn syscall0(id: Syscall) -> usize {
+pub unsafe extern fn syscall0(id: usize) -> usize {
     asm!(r#"
         move $v0, $a0
         syscall
@@ -149,7 +149,7 @@ pub unsafe extern fn syscall0(id: Syscall) -> usize {
 /// 1-argument syscall
 #[allow(unused)]
 #[naked]
-pub unsafe extern fn syscall1(_: usize, id: Syscall) -> usize {
+pub unsafe extern fn syscall1(_: usize, id: usize) -> usize {
     asm!(r#"
         move $v0, $a1
         syscall
@@ -159,7 +159,7 @@ pub unsafe extern fn syscall1(_: usize, id: Syscall) -> usize {
 /// 2-argument syscall
 #[allow(unused)]
 #[naked]
-pub unsafe extern fn syscall2(_: usize, _: usize, id: Syscall) -> usize {
+pub unsafe extern fn syscall2(_: usize, _: usize, id: usize) -> usize {
     asm!(r#"
         move $v0, $a2
         syscall
@@ -169,7 +169,7 @@ pub unsafe extern fn syscall2(_: usize, _: usize, id: Syscall) -> usize {
 /// 3-argument syscall
 #[allow(unused)]
 #[naked]
-pub unsafe extern fn syscall3(_: usize, _: usize, _: usize, id: Syscall)
+pub unsafe extern fn syscall3(_: usize, _: usize, _: usize, id: usize)
         -> usize {
     asm!(r#"
         move $v0, $a3
@@ -181,7 +181,7 @@ pub unsafe extern fn syscall3(_: usize, _: usize, _: usize, id: Syscall)
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall4(_: usize, _: usize, _: usize, _: usize,
-        id: Syscall) -> usize {
+        id: usize) -> usize {
     asm!(r#"
         lw $v0, 0x10($sp)
         syscall
@@ -192,7 +192,7 @@ pub unsafe extern fn syscall4(_: usize, _: usize, _: usize, _: usize,
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall5(_: usize, _: usize, _: usize, _: usize,
-        _: usize, id: Syscall) -> usize {
+        _: usize, id: usize) -> usize {
     asm!(r#"
         lw $v0, 0x14($sp)
         syscall
@@ -203,7 +203,7 @@ pub unsafe extern fn syscall5(_: usize, _: usize, _: usize, _: usize,
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall6(_: usize, _: usize, _: usize, _: usize,
-        _: usize, _: usize, id: Syscall) -> usize {
+        _: usize, _: usize, id: usize) -> usize {
     asm!(r#"
         lw $v0, 0x18($sp)
         syscall
@@ -214,7 +214,7 @@ pub unsafe extern fn syscall6(_: usize, _: usize, _: usize, _: usize,
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall7(_: usize, _: usize, _: usize, _: usize,
-        _: usize, _: usize, _: usize, id: Syscall) -> usize {
+        _: usize, _: usize, _: usize, id: usize) -> usize {
     asm!(r#"
         lw $v0, 0x1c($sp)
         syscall
@@ -225,7 +225,7 @@ pub unsafe extern fn syscall7(_: usize, _: usize, _: usize, _: usize,
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall8(_: usize, _: usize, _: usize, _: usize,
-        _: usize, _: usize, _: usize, _: usize, id: Syscall) -> usize {
+        _: usize, _: usize, _: usize, _: usize, id: usize) -> usize {
     asm!(r#"
         lw $v0, 0x20($sp)
         syscall
@@ -236,7 +236,7 @@ pub unsafe extern fn syscall8(_: usize, _: usize, _: usize, _: usize,
 #[allow(unused)]
 #[naked]
 pub unsafe extern fn syscall9(_: usize, _: usize, _: usize, _: usize,
-        _: usize, _: usize, _: usize, _: usize, _: usize, id: Syscall)
+        _: usize, _: usize, _: usize, _: usize, _: usize, id: usize)
         -> usize {
     asm!(r#"
         lw $v0, 0x24($sp)
@@ -293,6 +293,9 @@ pub fn spawn<F, T>(f: F) -> Result<JoinHandle<T>>
         // Region size
         let mut rsize = 0usize;
 
+        // Free the stack and then exit the thread. We do this in one assembly
+        // block to ensure we don't touch any stack memory during this stage
+        // as we are freeing the stack.
         unsafe {
             asm!(r#"
                 // Set the link register
@@ -387,7 +390,7 @@ pub fn spawn<F, T>(f: F) -> Result<JoinHandle<T>>
             0,
 
             // Syscall number
-            Syscall::CreateThread
+            Syscall::CreateThread as usize
         )
     } as u32);
 
